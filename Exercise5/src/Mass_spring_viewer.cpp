@@ -16,6 +16,7 @@
 #include "Mass_spring_viewer.h"
 #include "utils/gl_text.h"
 #include <sstream>
+#include <cmath>
 
 
 //== IMPLEMENTATION ==========================================================
@@ -365,6 +366,14 @@ void Mass_spring_viewer::time_integration(float dt)
              \li Hint: compute_forces() computes all forces for the current positions and velocities.
              */
 
+            compute_forces();
+
+            for (unsigned int i=0; i<body_.particles.size(); ++i)
+            {
+                body_.particles[i].acceleration = body_.particles[i].force / body_.particles[i].mass;
+                body_.particles[i].velocity += dt*body_.particles[i].acceleration;
+                body_.particles[i].position += dt*body_.particles[i].velocity; // Use new velocity
+            }
 
             break;
         }
@@ -418,13 +427,20 @@ Mass_spring_viewer::compute_forces()
      */
     if (external_force_ == Center)
     {
-
+        for (unsigned int i=0; i<body_.particles.size(); ++i)
+        {
+            body_.particles[i].force += 20*(vec2(0,0) - body_.particles[i].position);
+        }
     }
 
 
     /** \todo (Part 1) Implement damping force
      \li The damping coefficient is given as member damping_
      */
+    for (unsigned int i=0; i<body_.particles.size(); ++i)
+    {
+        body_.particles[i].force += -damping_*body_.particles[i].velocity;
+    }
 
 
 
@@ -433,7 +449,11 @@ Mass_spring_viewer::compute_forces()
      */
     if (external_force_ == Gravitation)
     {
-
+        for (unsigned int i=0; i<body_.particles.size(); ++i)
+        {
+            body_.particles[i].force += vec2(0.f,-9.81)*body_.particles[i].mass;
+            // body_.particles[i].force += vec2(0.f,-9.81)*particle_mass_;
+        }
     }
 
 
@@ -443,13 +463,53 @@ Mass_spring_viewer::compute_forces()
     // collision forces
     if (collisions_ == Force_based)
     {
-        float planes[4][3] = {
+        const int nbPanes = 4;
+        float planes[nbPanes][3] = {
             {  0.0,  1.0, 1.0 },
             {  0.0, -1.0, 1.0 },
             {  1.0,  0.0, 1.0 },
-            { -1.0,  0.0, 1.0 }
+            { -1.0,  0.0, 1.0 }/*,
+            {  -0.2, 1.0, 0.9 }*/ // Test with an oblique pane (Warning: change "nbPanes" to 5)
         };
 
+        vec2 planesNorms[nbPanes]; // Norms of the plane
+        float planesP[nbPanes]; // Distance from the origin
+
+        for(unsigned int i=0; i<nbPanes; ++i)
+        {
+            // According to http://mathworld.wolfram.com/HessianNormalForm.html
+
+            float sqrtCoef = std::sqrt(planes[i][0]*planes[i][0] +
+                                       planes[i][1]*planes[i][1] +
+                                       planes[i][2]*planes[i][2]);
+
+            planesNorms[i] = vec2(planes[i][0]/sqrtCoef,
+                                  planes[i][1]/sqrtCoef);
+
+            planesP[i] = planes[i][2]/sqrtCoef;
+        }
+
+        for (unsigned int i=0; i<body_.particles.size(); ++i)
+        {
+            vec2 boudaryVec(0,0);
+            bool hasCollisions = false;
+
+            for (unsigned int j=0 ; j<nbPanes ; ++j)
+            {
+                float distPointPlanes = dot(planesNorms[j], body_.particles[i].position) + planesP[j];
+                if(distPointPlanes < particle_radius_) // Collision
+                {
+                    // std::cout << distPointPlanes << std::endl;
+                    boudaryVec += collision_stiffness_ * (particle_radius_-distPointPlanes) * planesNorms[j];
+                    hasCollisions = true;
+                }
+            }
+
+            if(hasCollisions)
+            {
+                body_.particles[i].force += boudaryVec;
+            }
+        }
 
     }
 
@@ -464,6 +524,13 @@ Mass_spring_viewer::compute_forces()
         vec2 pos0 = p0.position;
         vec2 pos1 = mouse_spring_.mouse_position;
 
+        vec2 vel0 = p0.velocity;
+        vec2 vel1 = vec2(0,0);
+
+        float d = norm(pos0 - pos1);
+
+        p0.force += -1 * (spring_stiffness_*d + spring_damping_*dot(vel0-vel1, pos0-pos1)/d) * ((pos0-pos1)/d);
+
     }
 
 
@@ -471,7 +538,22 @@ Mass_spring_viewer::compute_forces()
      \li Required information about springs in the scene are found in body_.springs
      \li Required coefficients are given as spring_stiffness_ and spring_damping_
      */
+    for (unsigned int i=0; i<body_.springs.size(); ++i){
+        Spring &nextSpring = body_.springs[i];
 
+        vec2 pos0 = nextSpring.particle0->position;
+        vec2 pos1 = nextSpring.particle1->position;
+
+        vec2 vel0 = nextSpring.particle0->velocity;
+        vec2 vel1 = nextSpring.particle1->velocity;
+
+        float d = norm(pos0 - pos1);
+
+        vec2 f0 = -1 * (spring_stiffness_*(d-nextSpring.rest_length) + spring_damping_*dot(vel0-vel1, pos0-pos1)/d) * ((pos0-pos1)/d);
+        nextSpring.particle0->force += f0;
+        nextSpring.particle1->force -= f0;
+
+    }
 
 
     /** \todo (Part 2) Compute more forces in part 2 of the exercise: triangle-area forces, binding forces, etc.
