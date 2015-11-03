@@ -438,6 +438,23 @@ void Mass_spring_viewer::time_integration(float dt)
              \li Hint: compute_forces() computes all forces for the current positions and velocities.
              */
 
+            compute_forces();
+
+            for (unsigned int i=0; i<body_.particles.size(); ++i)
+            {
+                if(body_.particles[i].locked)
+                {
+                    continue; // No change
+                }
+
+                // Compute ...
+                vec2 originalPosition = body_.particles[i].position; //x(t)
+
+                body_.particles[i].position += dt*body_.particles[i].velocity + ((dt*dt)/2)*body_.particles[i].acceleration; // x(t+h)
+                body_.particles[i].velocity = (body_.particles[i].position - originalPosition) / dt; // x(t+h)
+                body_.particles[i].acceleration = body_.particles[i].force / body_.particles[i].mass; // a(t+h)
+            }
+
             break;
         }
     }
