@@ -358,6 +358,10 @@ void Mass_spring_viewer::motion(int _x, int _y)
 
 void Mass_spring_viewer::time_integration(float dt)
 {
+
+
+    // Integrate
+
     switch (integration_)
     {
         case Euler:
@@ -366,10 +370,15 @@ void Mass_spring_viewer::time_integration(float dt)
              \li Hint: compute_forces() computes all forces for the current positions and velocities.
              */
 
+            // Compute forces
             compute_forces();
 
             for (unsigned int i=0; i<body_.particles.size(); ++i)
             {
+                if(body_.particles[i].locked)
+                {
+                    continue; // No change
+                }
                 body_.particles[i].acceleration = body_.particles[i].force / body_.particles[i].mass;
                 body_.particles[i].velocity += dt*body_.particles[i].acceleration;
                 body_.particles[i].position += dt*body_.particles[i].velocity; // Use new velocity
@@ -385,9 +394,42 @@ void Mass_spring_viewer::time_integration(float dt)
              \li Hint: compute_forces() computes all forces for the current positions and velocities.
              */
 
+            compute_forces(); // For x1, v1
+
+            for (unsigned int i=0; i<body_.particles.size(); ++i)
+            {
+                if(body_.particles[i].locked)
+                {
+                    continue; // No change
+                }
+
+                // Save current pos and speed
+                body_.particles[i].position_t = body_.particles[i].position; // Save x(t)
+                body_.particles[i].velocity_t = body_.particles[i].velocity; // Save v(t)
+
+                // Compute ...
+                body_.particles[i].acceleration = body_.particles[i].force / body_.particles[i].mass; // a1
+                body_.particles[i].position += dt/2*body_.particles[i].velocity; // x2
+                body_.particles[i].velocity += dt/2*body_.particles[i].acceleration; // v2
+
+            }
+
+            compute_forces(); // For x2, v2
+
+            for (unsigned int i=0; i<body_.particles.size(); ++i)
+            {
+                if(body_.particles[i].locked)
+                {
+                    continue; // No change
+                }
+
+                body_.particles[i].acceleration = body_.particles[i].force / body_.particles[i].mass; // a2
+                body_.particles[i].position = body_.particles[i].position_t + dt/2*body_.particles[i].velocity; // x(t+h)
+                body_.particles[i].velocity = body_.particles[i].velocity_t + dt/2*body_.particles[i].acceleration; // v(t+h)
+            }
+
             break;
         }
-
 
         case Verlet:
         {
@@ -469,7 +511,7 @@ Mass_spring_viewer::compute_forces()
             {  0.0, -1.0, 1.0 },
             {  1.0,  0.0, 1.0 },
             { -1.0,  0.0, 1.0 }/*,
-            {  -0.2, 1.0, 0.9 }*/ // Test with an oblique pane (Warning: change "nbPanes" to 5)
+            { -0.2, 1.0, 0.8 }*/ // Test with an oblique pane (Warning: change "nbPanes" to 5)
         };
 
         vec2 planesNorms[nbPanes]; // Norms of the plane
@@ -568,12 +610,14 @@ void Mass_spring_viewer::impulse_based_collisions()
 {
     /** \todo (Part 2) Handle collisions based on impulses
      */
+    const int nbPanes = 4;
     // planes for which we compute collisions
-    float planes[4][3] = {
+    float planes[nbPanes][3] = {
         {  0.0,  1.0, 1.0 },
         {  0.0, -1.0, 1.0 },
         {  1.0,  0.0, 1.0 },
-        { -1.0,  0.0, 1.0 }
+        { -1.0,  0.0, 1.0 }/*,
+        { -0.2, 1.0, 0.8 }*/ // Test with an oblique pane (Warning: change "nbPanes" to 5)
     };
 }
 
