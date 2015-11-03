@@ -447,12 +447,21 @@ void Mass_spring_viewer::time_integration(float dt)
                     continue; // No change
                 }
 
-                // Compute ...
-                vec2 originalPosition = body_.particles[i].position; //x(t)
-
+                body_.particles[i].acceleration = body_.particles[i].force / body_.particles[i].mass; // a(t)
                 body_.particles[i].position += dt*body_.particles[i].velocity + ((dt*dt)/2)*body_.particles[i].acceleration; // x(t+h)
-                body_.particles[i].velocity = (body_.particles[i].position - originalPosition) / dt; // x(t+h)
-                body_.particles[i].acceleration = body_.particles[i].force / body_.particles[i].mass; // a(t+h)
+            }
+
+            compute_forces();
+
+            for (unsigned int i=0; i<body_.particles.size(); ++i)
+            {
+                if(body_.particles[i].locked)
+                {
+                    continue; // No change
+                }
+
+                vec2 aTPlusH = body_.particles[i].force / body_.particles[i].mass; // a(t+h)
+                body_.particles[i].velocity += dt*(body_.particles[i].acceleration + aTPlusH) / 2; // v(t+h)
             }
 
             break;
