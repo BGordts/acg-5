@@ -626,6 +626,37 @@ Mass_spring_viewer::compute_forces()
 
     /** \todo (Part 2) Compute more forces in part 2 of the exercise: triangle-area forces, binding forces, etc.
      */
+
+    //For each triangle : from http://cg.informatik.uni-freiburg.de/course_notes/sim_03_masspoint.pdf
+    for (unsigned int k = 0; k < body_.triangles.size(); k++) {
+        float ka = area_stiffness_;
+        Triangle triangle = body_.triangles[k];
+
+        //sommets
+        vec2 &x0 = triangle.particle0->position;
+        vec2 &x1 = triangle.particle1->position;
+        vec2 &x2 = triangle.particle2->position;
+
+        vec2 e1 = vec2(x2[1]-x0[1],x0[0]-x2[0]);
+        vec2 e2 = vec2(x1[1]-x2[1],x2[0]-x1[0]);
+        vec2 e3 = vec2(x0[1]-x1[1],x1[0]-x0[0]);
+
+//        vec2 e1 = x2-x0;
+//        vec2 e2 = x2-x1;
+//        vec2 e3 = e2-e1;
+
+        //Compute constraint
+        float A = triangle.rest_area;
+        float aire = triangle.area();
+        float C = 0.5f*(aire - A);
+
+        if (area_forces_)
+        {
+            // Forces Fi = -ka*dC/dxi
+            triangle.particle0->force += - ka * C * e2 ;
+            triangle.particle1->force += - ka * C * e1 ;
+            triangle.particle2->force += - ka * C * e3 ;
+        }
 }
 
 
